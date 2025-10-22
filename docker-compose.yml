@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  hrtraders:
+    build: ./backend
+    environment:
+      - DRY_RUN=true
+      - TRADELOCKER_REST=https://public-api.tradelocker.com
+      - AUTH_TOKEN=
+      - TELEGRAM_BOT_TOKEN=
+      - TELEGRAM_CHAT_ID=
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+    restart: unless-stopped

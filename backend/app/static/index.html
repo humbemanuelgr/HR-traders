@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>H.R-traders</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; }
+      h1 { margin-top: 0; }
+      input, button, select { padding: 8px; margin: 4px 0; }
+      code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+      .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 12px 0; }
+      .row { display: flex; gap: 12px; flex-wrap: wrap; }
+      .col { flex: 1 1 320px; }
+      .small { color: #666; font-size: 12px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #eee; padding: 8px; text-align: left; }
+      th { background: #fafafa; }
+    </style>
+  </head>
+  <body>
+    <h1>H.R-traders</h1>
+    <p class="small">Backend DRY_RUN: by default the API will simulate follower orders. Set <code>DRY_RUN=false</code> for real broker calls.</p>
+
+    <div class="row">
+      <div class="col card">
+        <h3>Crear cuenta</h3>
+        <label>Nombre<br><input id="name"></label><br>
+        <label>Cuenta TradeLocker<br><input id="acct"></label><br>
+        <label>API Key<br><input id="key"></label><br>
+        <label><input type="checkbox" id="is_master"> Es Master</label><br>
+        <button onclick="createAccount()">Guardar</button>
+      </div>
+      <div class="col card">
+        <h3>Disparar orden del Master</h3>
+        <label>Símbolo<br><input id="sym" value="XAUUSD"></label><br>
+        <label>Lado<br>
+          <select id="side">
+            <option value="buy">buy</option>
+            <option value="sell">sell</option>
+          </select>
+        </label><br>
+        <label>Tamaño<br><input id="size" type="number" step="0.01" value="1"></label><br>
+        <label>Tipo<br>
+          <select id="otype">
+            <option value="market">market</option>
+            <option value="limit">limit</option>
+          </select>
+        </label><br>
+        <label>Precio (si limit)<br><input id="price" type="number" step="0.01"></label><br>
+        <button onclick="sendMasterOrder()">Enviar</button>
+        <pre id="resp" class="small"></pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Cuentas</h3>
+      <table id="acct_tbl">
+        <thead><tr><th>ID</th><th>Nombre</th><th>Cuenta</th><th>Master</th><th>Enabled</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Order Map (master → followers)</h3>
+      <table id="map_tbl">
+        <thead><tr><th>Fecha</th><th>Master Order</th><th>Follower ID</th><th>Follower Order</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <script>
+      async function refresh(){
+        const a = await fetch('/api/accounts'); const accounts = await a.json();
+        const tb = document.querySelector('#acct_tbl tbody'); tb.innerHTML='';
+        for (const x of accounts){
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${x.id}</td><td>${x.name}</td><td>${x.tradelocker_account}</td><td>${x.is_master}</td><td>${x.enabled}</td>`;
+          tb.appendChild(tr);
+        }
+        const m = await fetch('/api/order-maps'); const maps = await m.json();
+        const tb2 = document.querySelector('#map_tbl tbody'); tb2.innerHTML='';
+        for (const y of maps){
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${y.created_at}</td><td>${y.master_order_id}</td><td>${y.follower_account_id}</td><td>${y.follower_order_id}</td><td>${y.status}</td>`;
+          tb2.appendChild(tr);
+        }
+      }
+      async function createAccount(){
+        const body = {
+          name: document.getElementById('name').value,
+          tradelocker_account: document.getElementById('acct').value,
+          api_key: document.getElementById('key').value,
+          is_master: document.getElementById('is_master').checked
+        };
+        await fetch('/api/accounts',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        await refresh();
+      }
+      async function sendMasterOrder(){
+        const payload = {
+          symbol: document.getElementById('sym').value,
+          side: document.getElementById('side').value,
+          size: parseFloat(document.getElementById('size').value),
+          type: document.getElementById('otype').value,
+        };
+        const price = document.getElementById('price').value;
+        if (price) payload.price = parseFloat(price);
+        const body = { type: 'order.create', payload };
+        const r = await fetch('/api/master/event',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        const txt = await r.text();
+        document.getElementById('resp').innerText = txt;
+        await refresh();
+      }
+      refresh();
+    </script>
+  </body>
+</html>
